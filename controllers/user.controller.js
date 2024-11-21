@@ -1,28 +1,79 @@
-// controllers/user.controller.js
 const pool = require('../lib/database.js');
 
-
 class UserController {
-    async getUserData(req, res) {
-        try {
-            const { userId } = req.user; // asumiendo que ya está autenticado y req.user contiene la información del usuario
-            const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [userId]);
-            const userData = rows[0];
-
-            if (!userData) {
-                res.writeHead(404, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ msg: 'Usuario no encontrado' }));
-                return;
+    // Obtener datos de un usuario
+    async getAllUsers(req, res) {
+        if (req.user.role !== 'superadmin') {
+            
+            if (!res.headersSent) {
+                res.writeHead(403, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ msg: 'No autorizado' }));
             }
-
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ data: userData }));
+            return;  
+        }
+    
+        try {
+            const [rows] = await pool.query('SELECT * FROM users');
+            if (!res.headersSent) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ data: rows }));
+            }
         } catch (error) {
             console.error(error);
-            res.writeHead(500, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ msg: 'Error en el servidor' }));
+
+            if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ msg: 'Error en el servidor' }));
+            }
         }
     }
+
+ 
+    // Eliminar un usuario
+async deleteUser(req, res) {
+
+    if (req.user.role !== 'superadmin') {
+        if (!res.headersSent) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: 'No autorizado' }));
+        }
+        return;  
+    }
+
+    const { username } = req.params;
+
+    
+    if (req.user.username === username) {
+        if (!res.headersSent) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: 'No puedes eliminar tu propio usuario' }));
+        }
+        return;  
+    }
+
+    try {
+        const [result] = await pool.execute('DELETE FROM users WHERE username = ?', [username]);
+
+        if (result.affectedRows === 0) {
+            if (!res.headersSent) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Usuario no encontrado' }));
+            }
+            return;  
+        }
+
+        if (!res.headersSent) {
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: 'Usuario eliminado correctamente' }));
+        }
+    } catch (error) {
+        console.error('Error al eliminar usuario:', error);
+        if (!res.headersSent) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ message: 'Error al eliminar usuario' }));
+        }
+    }
+}
 }
 
 const userController = new UserController();

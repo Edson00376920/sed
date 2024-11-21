@@ -1,68 +1,146 @@
+const pool = require('../lib/database');
+const { authenticate, authorize } = require('../middleware/authMiddleware');
+
 class ProductController {
-    async addProduct(req, res) {
-        const { name, price, image_url } = req.body
-        const sellerId = req.user.id 
 
-        if (!name || !price) {
-            return res.writeHead(400, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Datos incompletos' }))
+    // Crear un producto
+    async createProduct(req, res) {
+        if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            if (!res.headersSent) {
+                res.writeHead(403, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'No autorizado' }));
+            }
+            return; 
+        }
+
+        const { name, price, image } = req.body;
+        if (!name || !price || !image) {
+            if (!res.headersSent) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Faltan campos obligatorios: name, price, image' }));
+            }
+            return; 
         }
 
         try {
             const [result] = await pool.execute(
-                'INSERT INTO products (name, price, image_url, seller_id) VALUES (?, ?, ?, ?)',
-                [name, price, image_url || null, sellerId]
-            )
-            res.writeHead(201, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Producto agregado', productId: result.insertId }))
+                'INSERT INTO products (name, price, image) VALUES (?, ?, ?)',
+                [name, price, image]
+            );
+            if (!res.headersSent) {
+                res.writeHead(201, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Producto creado exitosamente', id: result.insertId }));
+            }
         } catch (error) {
-            res.writeHead(500, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Error al agregar el producto' }))
+            console.error('Error al crear producto:', error);
+            if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Error al crear producto' }));
+            }
         }
     }
 
+    // Obtener todos los productos
+    async getProducts(req, res) {
+        try {
+            const [products] = await pool.execute('SELECT * FROM products');
+            if (!res.headersSent) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(products));
+            }
+        } catch (error) {
+            console.error('Error al obtener productos:', error);
+            if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Error al obtener productos' }));
+            }
+        }
+    }
+
+    // Actualizar un producto
     async updateProduct(req, res) {
-        const { id } = req.params
-        const { name, price, image_url } = req.body
-        const sellerId = req.user.id
+        if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            if (!res.headersSent) {
+                res.writeHead(403, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'No autorizado' }));
+            }
+            return;
+        }
+
+        const { name } = req.params;
+        const { price, image } = req.body;
+
+        if (!price || !image) {
+            if (!res.headersSent) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Faltan campos obligatorios: price, image' }));
+            }
+            return;
+        }
 
         try {
             const [result] = await pool.execute(
-                'UPDATE products SET name = ?, price = ?, image_url = ? WHERE id = ? AND seller_id = ?',
-                [name, price, image_url, id, sellerId]
-            )
+                'UPDATE products SET price = ?, image = ? WHERE name = ?',
+                [price, image, name]
+            );
+
             if (result.affectedRows === 0) {
-                return res.writeHead(404, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Producto no encontrado o no autorizado' }))
+                if (!res.headersSent) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ message: 'Producto no encontrado' }));
+                }
+                return;
             }
-            res.writeHead(200, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Producto actualizado' }))
+
+            if (!res.headersSent) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Producto actualizado correctamente' }));
+            }
         } catch (error) {
-            res.writeHead(500, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Error al actualizar el producto' }))
+            console.error('Error al actualizar producto:', error);
+            if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Error al actualizar producto' }));
+            }
         }
     }
 
+    // Eliminar un producto
     async deleteProduct(req, res) {
-        const { id } = req.params
-        const sellerId = req.user.id
-
-        try {
-            const [result] = await pool.execute('DELETE FROM products WHERE id = ? AND seller_id = ?', [id, sellerId])
-            if (result.affectedRows === 0) {
-                return res.writeHead(404, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Producto no encontrado o no autorizado' }))
+        if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            if (!res.headersSent) {
+                res.writeHead(403, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'No autorizado' }));
             }
-            res.writeHead(200, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Producto eliminado' }))
-        } catch (error) {
-            res.writeHead(500, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Error al eliminar el producto' }))
+            return;
         }
-    }
 
-    async getAllProducts(req, res) {
-        const sellerId = req.user.id
+        const { name } = req.params;
 
         try {
-            const [products] = await pool.execute('SELECT * FROM products WHERE seller_id = ?', [sellerId])
-            res.writeHead(200, {'Content-Type': 'application/json'}).end(JSON.stringify(products))
+            const [result] = await pool.execute('DELETE FROM products WHERE name = ?', [name]);
+
+            if (result.affectedRows === 0) {
+                if (!res.headersSent) {
+                    res.writeHead(404, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ message: 'Producto no encontrado' }));
+                }
+                return;
+            }
+
+            if (!res.headersSent) {
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Producto eliminado correctamente' }));
+            }
         } catch (error) {
-            res.writeHead(500, {'Content-Type': 'application/json'}).end(JSON.stringify({ msg: 'Error al obtener los productos' }))
+            console.error('Error al eliminar producto:', error);
+            if (!res.headersSent) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ message: 'Error al eliminar producto' }));
+            }
         }
     }
 }
 
-const productController = new ProductController()
-module.exports = { productController }
+const productController = new ProductController();
+module.exports = { productController };

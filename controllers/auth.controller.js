@@ -1,10 +1,10 @@
-const pool = require('../lib/database.js');
+const pool = require('../lib/database');
 const bcrypt = require('bcrypt');
 
 class AuthController {
     async register(req, res) {
         try {
-            const { username, password, role = 'user' } = req.body; // Asigna 'user' como valor predeterminado para role
+            const { username, password, role = 'user' } = req.body; // Asignación de rol predeterminado
 
             if (!username || !password || !['user', 'admin', 'superadmin'].includes(role)) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -65,6 +65,7 @@ class AuthController {
         }
     }
 }
+
 
 const authController = new AuthController();
 module.exports = { authController };
