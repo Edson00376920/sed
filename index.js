@@ -2,6 +2,8 @@ const http = require('http');
 const { indexRoutes } = require('./routes/index.routes.js');
 const { router } = require('./lib/router')
 
+
+
 class Server {
     PORT = process.env.PORT || 5000
     server;

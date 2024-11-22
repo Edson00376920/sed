@@ -17,6 +17,7 @@ class IndexRoutes {
             middlewares: [authenticate, authorize(['user', 'admin', 'superadmin'])] 
         },
 
+
         // Rutas de productos (protegidas por authenticate y authorize)
         { 
             method: 'get', 
@@ -42,7 +43,7 @@ class IndexRoutes {
             middlewares: [authenticate, authorize(['admin', 'superadmin'])]
         },
 
-        // rutas para usuarios (solo superadmin puede acceder)
+        // Rutas para usuarios (solo superadmin puede acceder)
         { 
             method: 'get', 
             path: '/users', 

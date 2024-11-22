@@ -1,38 +1,31 @@
-const pool = require('../lib/database');
+require('dotenv').config();
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = process.env;
 
-async function authenticate(req, res, next) {
-    const sessionId = req.headers.cookie?.split('sessionId=')[1];
-
-    if (!sessionId) {
-        return res.writeHead(401, { 'Content-Type': 'application/json' })
-            .end(JSON.stringify({ msg: 'No autenticado' }));  
+function authenticate(req, res, next) {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ msg: 'Token requerido' }));
     }
 
     try {
-        const [rows] = await pool.query('SELECT * FROM users WHERE session_id = ?', [sessionId]);
-        const user = rows[0];
-
-        if (!user) {
-            return res.writeHead(403, { 'Content-Type': 'application/json' })
-                .end(JSON.stringify({ msg: 'Sesión inválida o expirada' }));  
-        }
-
-        req.user = user; 
-        next(); 
+        const decoded = jwt.verify(token, JWT_SECRET);
+        req.user = decoded;
+        next();
     } catch (error) {
-        console.error(error);
-        return res.writeHead(500, { 'Content-Type': 'application/json' })
-            .end(JSON.stringify({ msg: 'Error en el servidor' }));  
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ msg: 'Token inválido' }));
     }
 }
 
 function authorize(roles = []) {
     return (req, res, next) => {
         if (!roles.includes(req.user.role)) {
-            return res.writeHead(403, { 'Content-Type': 'application/json' })
-                .end(JSON.stringify({ msg: 'No autorizado' }));  
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ msg: 'Acceso denegado' }));
         }
-        next(); 
+        next();
     };
 }
 
